@@ -7,66 +7,65 @@ use termion::{
 };
 use termion::event::Key;
 use termion::raw::IntoRawMode;
-
 use std::thread;
 use std::sync::Arc;
 use std::sync::mpsc;
 
 pub struct Scroller {
-    stdout: Arc<termion::raw::RawTerminal<std::io::Stdout>>,
-    tx: mpsc::Sender<String>,
+    screen: Arc<termion::raw::RawTerminal<std::io::Stdout>>,
+    sender: mpsc::Sender<String>,
     rows: u16,
 }
 
 impl Scroller {
     pub fn new() -> Self {
-        let stdout = Arc::new(std::io::stdout().into_raw_mode().unwrap());
+        let screen = Arc::new(std::io::stdout().into_raw_mode().unwrap());
         let (_, rows) = termion::terminal_size().unwrap();
         
         // prepare screen
         {
-            let mut stdout = stdout.lock();
-            write!(stdout, "{}", clear::All).unwrap();
-            write!(stdout, "{}", cursor::Goto(1, rows)).unwrap();
-            stdout.flush().unwrap();
+            let mut screen = screen.lock();
+            write!(screen, "{}", clear::All).unwrap();
+            write!(screen, "{}", cursor::Goto(1, rows)).unwrap();
+            screen.flush().unwrap();
         }
 
         let (tx, rx) = mpsc::channel::<String>();
 
         // start printing
         {
-            let stdout = Arc::clone(&stdout);
+            let screen = Arc::clone(&screen);
             thread::spawn(move || {
                 loop {
                     // wait for text to arrive
                     let line = rx.recv().unwrap();
 
                     // take stdout here
-                    let mut stdout = stdout.lock();
+                    let mut screen = screen.lock();
 
                     // save current position
-                    write!(stdout, "{}", termion::cursor::Save).unwrap();
+                    write!(screen, "{}", termion::cursor::Save).unwrap();
 
                     // scroll up
-                    write!(stdout, "{}", termion::scroll::Up(1)).unwrap();
+                    write!(screen, "{}", termion::scroll::Up(1)).unwrap();
 
                     // go to bottom line - 1
-                    write!(stdout, "{}", cursor::Goto(1, rows - 1)).unwrap();
+                    write!(screen, "{}", cursor::Goto(1, rows - 1)).unwrap();
 
                     // write text to that line
-                    write!(stdout, "{}", line).unwrap();
+                    write!(screen, "{}", line).unwrap();
                     
                     // restore position
-                    write!(stdout, "{}", termion::cursor::Restore).unwrap();
+                    write!(screen, "{}", termion::cursor::Restore).unwrap();
 
-                    stdout.flush().unwrap();
+                    screen.flush().unwrap();
                 }
             });
         }
 
         Scroller {
-            stdout,
-            tx,
+            screen,
+            sender: tx,
             rows,
         }
     }
@@ -76,27 +75,27 @@ impl Scroller {
         let mut line: std::vec::Vec<char> = vec![];
         for key in stdin().keys() {
             // take stdout here
-            let mut stdout = self.stdout.lock();
+            let mut screen = self.screen.lock();
 
             match key.unwrap() {
                 // clear line and do action on enter
                 Key::Char('\n') => {
-                    write!(stdout, "{}", cursor::Goto(1, self.rows)).unwrap();
-                    write!(stdout, "{}", clear::CurrentLine).unwrap();
-                    self.tx.send(line.iter().collect()).unwrap();
+                    write!(screen, "{}", cursor::Goto(1, self.rows)).unwrap();
+                    write!(screen, "{}", clear::CurrentLine).unwrap();
+                    self.sender.send(line.iter().collect()).unwrap();
                     line.clear();
                 },
 
                 // add char to buffer and print
                 Key::Char(c) => {
-                    write!(stdout, "{}", c).unwrap();
+                    write!(screen, "{}", c).unwrap();
                     line.push(c);
                 },
 
                 // go one char back and clear it
                 Key::Backspace => {
-                    write!(stdout, "{}", cursor::Left(1)).unwrap();
-                    write!(stdout, "{}", clear::AfterCursor).unwrap();
+                    write!(screen, "{}", cursor::Left(1)).unwrap();
+                    write!(screen, "{}", clear::AfterCursor).unwrap();
                     line.pop();
                 },
 
@@ -108,11 +107,11 @@ impl Scroller {
                 // anything else will continue
                 _ => continue,
             }
-            stdout.flush().unwrap();
+            screen.flush().unwrap();
         }
     }
 
     pub fn exit(self) {
-        self.stdout.suspend_raw_mode().unwrap();
+        self.screen.suspend_raw_mode().unwrap();
     }
 }
