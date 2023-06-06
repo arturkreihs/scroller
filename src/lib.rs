@@ -1,15 +1,17 @@
 use std::io::Write;
 use std::io::stdin;
-use termion::input::TermRead;
+use std::thread;
 use termion::{
     clear,
     cursor,
+    input::TermRead,
+    event::Key,
+    raw::IntoRawMode,
 };
-use termion::event::Key;
-use termion::raw::IntoRawMode;
-use std::thread;
-use std::sync::Arc;
-use std::sync::mpsc;
+use std::sync::{
+    Arc,
+    mpsc,
+};
 
 pub struct Scroller {
     screen: Arc<termion::raw::RawTerminal<std::io::Stdout>>,
@@ -70,7 +72,11 @@ impl Scroller {
         }
     }
 
-    pub fn pool(&mut self) {
+    pub fn write(&mut self, line: &str) {
+        self.sender.send(line.into()).unwrap();
+    }
+
+    pub fn read(&mut self) -> Option<String> {
         // char buffer
         let mut line: std::vec::Vec<char> = vec![];
         for key in stdin().keys() {
@@ -82,8 +88,9 @@ impl Scroller {
                 Key::Char('\n') => {
                     write!(screen, "{}", cursor::Goto(1, self.rows)).unwrap();
                     write!(screen, "{}", clear::CurrentLine).unwrap();
-                    self.sender.send(line.iter().collect()).unwrap();
-                    line.clear();
+                    // self.sender.send(line.iter().collect()).unwrap();
+                    // line.clear();
+                    return Some(line.iter().collect());
                 },
 
                 // add char to buffer and print
@@ -109,9 +116,12 @@ impl Scroller {
             }
             screen.flush().unwrap();
         }
+        None
     }
+}
 
-    pub fn exit(self) {
+impl Drop for Scroller {
+    fn drop(&mut self) {
         self.screen.suspend_raw_mode().unwrap();
     }
 }
