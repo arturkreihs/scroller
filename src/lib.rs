@@ -19,6 +19,12 @@ pub struct Scroller {
     rows: u16,
 }
 
+impl Default for Scroller {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Scroller {
     pub fn new() -> Self {
         let screen = Arc::new(std::io::stdout().into_raw_mode().unwrap());
