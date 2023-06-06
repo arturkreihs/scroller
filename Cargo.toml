@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 termion = { version = "2.0.1", default-features = false }
+thiserror = { version = "1.0.40", default-features = false }
