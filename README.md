@@ -1,4 +1,4 @@
-# scroller
+# Scroller
 ### Usage
 ```
 use scroller::Scroller;
