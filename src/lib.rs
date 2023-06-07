@@ -1,5 +1,8 @@
 use std::io::Write;
 use std::io::stdin;
+use std::sync::Mutex;
+use std::cell::RefCell;
+use thiserror::Error;
 use termion::{
     clear,
     cursor,
@@ -7,9 +10,6 @@ use termion::{
     event::Key,
     raw::IntoRawMode,
 };
-use thiserror::Error;
-use std::sync::Mutex;
-use std::cell::RefCell;
 
 #[derive(Error, Debug)]
 pub enum ScrollerError {
@@ -49,37 +49,36 @@ impl Scroller {
         })
     }
 
-    pub async fn write(&self, line: &str) -> Result<(), ScrollerError> {
+    pub fn write(&self, line: &str) -> Result<(), ScrollerError> {
         let mut screen = self.screen.lock();
         // save current position
-        write!(screen, "{}", termion::cursor::Save).unwrap();
+        write!(screen, "{}", termion::cursor::Save)?;
 
         // scroll up
-        write!(screen, "{}", termion::scroll::Up(1)).unwrap();
+        write!(screen, "{}", termion::scroll::Up(1))?;
 
         // go to bottom line - 1
-        write!(screen, "{}", cursor::Goto(1, self.rows - 1)).unwrap();
+        write!(screen, "{}", cursor::Goto(1, self.rows - 1))?;
 
         // write text to that line
-        write!(screen, "{}", line).unwrap();
+        write!(screen, "{}", line)?;
         
-        // clear the rest
-        write!(screen, "{}", clear::AfterCursor).unwrap();
+        // clear the rest (rubbish after scrool::Up)
+        write!(screen, "{}", clear::AfterCursor)?;
 
-        write!(screen, "{}", cursor::Goto(1, self.rows)).unwrap();
+        // set cursor to the bottom line
+        write!(screen, "{}", cursor::Goto(1, self.rows))?;
 
+        // write unprocessed user input
         let input = self.input.lock().unwrap();
-        let line = input.borrow();
-        write!(screen, "{}", line.iter().collect::<String>()).unwrap();
+        let input = input.borrow();
+        write!(screen, "{}", input.iter().collect::<String>())?;
 
-        // restore position
-        write!(screen, "{}", termion::cursor::Restore).unwrap();
-
-        screen.flush().unwrap();
+        screen.flush()?;
         Ok(())
     }
 
-    pub async fn read(&self) -> Result<Option<String>, ScrollerError> {
+    pub fn read(&self) -> Result<Option<String>, ScrollerError> {
         for key in stdin().keys() {
             // take stdout here
             let mut screen = self.screen.lock();
