@@ -1,5 +1,4 @@
 use std::io::Write;
-// use std::io::stdin;
 use std::sync::Mutex;
 use std::cell::RefCell;
 use thiserror::Error;
@@ -15,6 +14,9 @@ use termion::{
 pub enum ScrollerError {
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
+    #[error("MutexGuard was poisoned")]
+    MutexPoisoned,
 }
 
 pub struct Scroller {
@@ -72,7 +74,7 @@ impl Scroller {
         write!(screen, "{}", cursor::Goto(1, self.rows))?;
 
         // write unprocessed user input
-        let input = self.input.lock().unwrap();
+        let input = self.input.lock().map_err(|_| ScrollerError::MutexPoisoned)?;
         let input = input.borrow();
         write!(screen, "{}", input.iter().collect::<String>())?;
 
@@ -86,7 +88,7 @@ impl Scroller {
             let mut screen = self.screen.lock();
 
             // take input buf here
-            let input = self.input.lock().unwrap();
+            let input = self.input.lock().map_err(|_| ScrollerError::MutexPoisoned)?;
             let mut line = input.borrow_mut();
 
             match key? {
