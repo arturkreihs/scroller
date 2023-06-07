@@ -59,6 +59,9 @@ impl Scroller {
         // write text to that line
         write!(screen, "{}", line).unwrap();
         
+        // clear the rest
+        write!(screen, "{}", clear::AfterCursor).unwrap();
+
         // restore position
         write!(screen, "{}", termion::cursor::Restore).unwrap();
 
