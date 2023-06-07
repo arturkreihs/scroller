@@ -8,6 +8,8 @@ use termion::{
     raw::IntoRawMode,
 };
 use thiserror::Error;
+use std::sync::Mutex;
+use std::cell::RefCell;
 
 #[derive(Error, Debug)]
 pub enum ScrollerError {
@@ -18,6 +20,7 @@ pub enum ScrollerError {
 pub struct Scroller {
     screen: termion::raw::RawTerminal<std::io::Stdout>,
     rows: u16,
+    input: Mutex<RefCell<Vec<char>>>,
 }
 
 impl Default for Scroller {
@@ -42,6 +45,7 @@ impl Scroller {
         Ok(Scroller {
             screen,
             rows,
+            input: Mutex::new(RefCell::new(Vec::<char>::new())),
         })
     }
 
@@ -62,6 +66,12 @@ impl Scroller {
         // clear the rest
         write!(screen, "{}", clear::AfterCursor).unwrap();
 
+        write!(screen, "{}", cursor::Goto(1, self.rows)).unwrap();
+
+        let input = self.input.lock().unwrap();
+        let line = input.borrow();
+        write!(screen, "{}", line.iter().collect::<String>()).unwrap();
+
         // restore position
         write!(screen, "{}", termion::cursor::Restore).unwrap();
 
@@ -70,18 +80,22 @@ impl Scroller {
     }
 
     pub async fn read(&self) -> Result<Option<String>, ScrollerError> {
-        // char buffer
-        let mut line: std::vec::Vec<char> = vec![];
         for key in stdin().keys() {
             // take stdout here
             let mut screen = self.screen.lock();
+
+            // take input buf here
+            let input = self.input.lock().unwrap();
+            let mut line = input.borrow_mut();
 
             match key? {
                 // clear line and do action on enter
                 Key::Char('\n') => {
                     write!(screen, "{}", cursor::Goto(1, self.rows))?;
                     write!(screen, "{}", clear::CurrentLine)?;
-                    return Ok(Some(line.iter().collect()));
+                    let val = line.iter().collect();
+                    line.clear();
+                    return Ok(Some(val));
                 },
 
                 // add char to buffer and print
