@@ -45,7 +45,7 @@ impl Scroller {
         })
     }
 
-    pub async fn write(&mut self, line: &str) -> Result<(), ScrollerError> {
+    pub async fn write(&self, line: &str) -> Result<(), ScrollerError> {
         let mut screen = self.screen.lock();
         // save current position
         write!(screen, "{}", termion::cursor::Save).unwrap();
@@ -66,7 +66,7 @@ impl Scroller {
         Ok(())
     }
 
-    pub async fn read(&mut self) -> Result<Option<String>, ScrollerError> {
+    pub async fn read(&self) -> Result<Option<String>, ScrollerError> {
         // char buffer
         let mut line: std::vec::Vec<char> = vec![];
         for key in stdin().keys() {
