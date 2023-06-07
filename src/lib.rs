@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::io::stdin;
+// use std::io::stdin;
 use std::sync::Mutex;
 use std::cell::RefCell;
 use thiserror::Error;
@@ -50,7 +50,9 @@ impl Scroller {
     }
 
     pub fn write(&self, line: &str) -> Result<(), ScrollerError> {
+        // take screen here
         let mut screen = self.screen.lock();
+
         // save current position
         write!(screen, "{}", termion::cursor::Save)?;
 
@@ -79,8 +81,8 @@ impl Scroller {
     }
 
     pub fn read(&self) -> Result<Option<String>, ScrollerError> {
-        for key in stdin().keys() {
-            // take stdout here
+        for key in std::io::stdin().keys() {
+            // take screen here
             let mut screen = self.screen.lock();
 
             // take input buf here
@@ -88,7 +90,7 @@ impl Scroller {
             let mut line = input.borrow_mut();
 
             match key? {
-                // clear line and do action on enter
+                // clear line and do action on enter key
                 Key::Char('\n') => {
                     write!(screen, "{}", cursor::Goto(1, self.rows))?;
                     write!(screen, "{}", clear::CurrentLine)?;
@@ -97,7 +99,7 @@ impl Scroller {
                     return Ok(Some(val));
                 },
 
-                // add char to buffer and print
+                // add char to buffer and print it
                 Key::Char(c) => {
                     write!(screen, "{}", c)?;
                     line.push(c);
@@ -110,7 +112,7 @@ impl Scroller {
                     line.pop();
                 },
 
-                // exit 'for' loop
+                // exit loop
                 Key::Ctrl('c') => {
                     break;
                 }
