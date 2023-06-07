@@ -3,16 +3,31 @@
 ```
 use anyhow::Result;
 use scroller::Scroller;
+use std::sync::Arc;
 
-fn main() -> Result<()> {
-    let mut scr = Scroller::new()?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    let scr = Arc::new(Scroller::new()?);
 
-    loop {
-        match scr.read()? {
-            Some(s) => scr.write(&s)?,
-            None => break,
-        }
+    {
+        let scr = Arc::clone(&scr);
+        tokio::spawn(async move {
+            let mut cntr = 0;
+            loop {
+                scr.write(&format!("line {}", cntr)).unwrap();
+                cntr += 1;
+                tokio::time::sleep(core::time::Duration::from_millis(1000)).await;
+            }
+        });
     }
+
+    while let Some(input) = scr.read()? {
+        let mut s = String::from(&input);
+        s.insert_str(0, ">>> ");
+        s.push_str(" <<<");
+        scr.write(&s)?;
+    }
+
     Ok(())
 }
 ```
