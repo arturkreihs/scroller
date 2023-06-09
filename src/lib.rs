@@ -21,7 +21,7 @@ pub enum ScrollerError {
 pub struct Scroller {
     screen: termion::raw::RawTerminal<std::io::Stdout>,
     rows: u16,
-    input: RwLock<Vec<char>>,
+    buffer: RwLock<Vec<char>>,
 }
 
 impl Default for Scroller {
@@ -46,7 +46,7 @@ impl Scroller {
         Ok(Scroller {
             screen,
             rows,
-            input: RwLock::new(Vec::<char>::new()),
+            buffer: RwLock::new(Vec::<char>::new()),
         })
     }
 
@@ -73,8 +73,8 @@ impl Scroller {
         write!(screen, "{}", cursor::Goto(1, self.rows))?;
 
         // write unprocessed user input
-        let input = self.input.read().map_err(|_| ScrollerError::RwLockPoisoned)?;
-        write!(screen, "{}", input.iter().collect::<String>())?;
+        let buffer = self.buffer.read().map_err(|_| ScrollerError::RwLockPoisoned)?;
+        write!(screen, "{}", buffer.iter().collect::<String>())?;
 
         screen.flush()?;
         Ok(())
@@ -86,29 +86,29 @@ impl Scroller {
             let mut screen = self.screen.lock();
 
             // take input buf here
-            let mut line = self.input.write().map_err(|_| ScrollerError::RwLockPoisoned)?;
+            let mut buffer = self.buffer.write().map_err(|_| ScrollerError::RwLockPoisoned)?;
 
             match key? {
                 // clear line and do action on enter key
                 Key::Char('\n') => {
                     write!(screen, "{}", cursor::Goto(1, self.rows))?;
                     write!(screen, "{}", clear::CurrentLine)?;
-                    let val = line.iter().collect();
-                    line.clear();
-                    return Ok(Some(val));
+                    let line = buffer.iter().collect();
+                    buffer.clear();
+                    return Ok(Some(line));
                 },
 
                 // add char to buffer and print it
                 Key::Char(c) => {
                     write!(screen, "{}", c)?;
-                    line.push(c);
+                    buffer.push(c);
                 },
 
                 // go one char back and clear it
                 Key::Backspace => {
                     write!(screen, "{}", cursor::Left(1))?;
                     write!(screen, "{}", clear::AfterCursor)?;
-                    line.pop();
+                    buffer.pop();
                 },
 
                 // exit loop
