@@ -1,6 +1,5 @@
 use std::io::Write;
-use std::sync::Mutex;
-use std::cell::RefCell;
+use std::sync::RwLock;
 use thiserror::Error;
 use termion::{
     clear,
@@ -15,14 +14,14 @@ pub enum ScrollerError {
     #[error(transparent)]
     IO(#[from] std::io::Error),
 
-    #[error("MutexGuard was poisoned")]
-    MutexPoisoned,
+    #[error("RwLock was poisoned")]
+    RwLockPoisoned,
 }
 
 pub struct Scroller {
     screen: termion::raw::RawTerminal<std::io::Stdout>,
     rows: u16,
-    input: Mutex<RefCell<Vec<char>>>,
+    input: RwLock<Vec<char>>,
 }
 
 impl Default for Scroller {
@@ -47,7 +46,7 @@ impl Scroller {
         Ok(Scroller {
             screen,
             rows,
-            input: Mutex::new(RefCell::new(Vec::<char>::new())),
+            input: RwLock::new(Vec::<char>::new()),
         })
     }
 
@@ -74,8 +73,7 @@ impl Scroller {
         write!(screen, "{}", cursor::Goto(1, self.rows))?;
 
         // write unprocessed user input
-        let input = self.input.lock().map_err(|_| ScrollerError::MutexPoisoned)?;
-        let input = input.borrow();
+        let input = self.input.read().map_err(|_| ScrollerError::RwLockPoisoned)?;
         write!(screen, "{}", input.iter().collect::<String>())?;
 
         screen.flush()?;
@@ -88,8 +86,7 @@ impl Scroller {
             let mut screen = self.screen.lock();
 
             // take input buf here
-            let input = self.input.lock().map_err(|_| ScrollerError::MutexPoisoned)?;
-            let mut line = input.borrow_mut();
+            let mut line = self.input.write().map_err(|_| ScrollerError::RwLockPoisoned)?;
 
             match key? {
                 // clear line and do action on enter key
