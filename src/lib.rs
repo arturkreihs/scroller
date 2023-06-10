@@ -95,6 +95,7 @@ impl Scroller {
                     write!(screen, "{}", clear::CurrentLine)?;
                     let line = buffer.iter().collect();
                     buffer.clear();
+                    screen.flush()?;
                     return Ok(Some(line));
                 },
 
