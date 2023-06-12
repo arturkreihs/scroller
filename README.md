@@ -1,4 +1,5 @@
 # Scroller
+A library that changes terminal into one scrolling part for output and the other part, bottom line, for input. It is written to be able to work asynchronously.
 ### Usage
 ```
 use anyhow::Result;
